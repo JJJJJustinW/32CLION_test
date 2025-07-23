@@ -29,7 +29,7 @@
 #define FDW_ADD 0x09   // FDW 通道线性向下扫描寄
 void Init_AD9959(void);
 
-void delay1(u32 length);
+void delay_1(u32 length);
 void IntReset(void);  // AD9959复位
 void IO_Update(void); // AD9959更新数据
 void Intserve(void);  // IO口初始化

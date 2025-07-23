@@ -66,7 +66,6 @@ static void MPU_Config(void);
   * @retval int
   */
 int main(void) {
-
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -101,9 +100,9 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
   while (1) {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
-    delay1(100000);
+    delay_1(100000);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-    delay1(100000);
+    delay_1(100000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -127,7 +126,8 @@ void SystemClock_Config(void) {
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
 
-  while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+  while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {
+  }
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -151,8 +151,8 @@ void SystemClock_Config(void) {
   /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-                                | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2
-                                | RCC_CLOCKTYPE_D3PCLK1 | RCC_CLOCKTYPE_D1PCLK1;
+    | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2
+    | RCC_CLOCKTYPE_D3PCLK1 | RCC_CLOCKTYPE_D1PCLK1;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
@@ -195,7 +195,6 @@ void MPU_Config(void) {
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
-
 }
 
 /**
