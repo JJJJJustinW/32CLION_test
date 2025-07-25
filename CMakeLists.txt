@@ -51,6 +51,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+        User/ADC
+        User/Serial
+        User/Delay
+        User/DDS
+        User/IIC
+        User/CH455
+        User/DoubleKeys
 )
 
 # Add project symbols (macros)

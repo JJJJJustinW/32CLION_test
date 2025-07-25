@@ -15,15 +15,23 @@
   *
   ******************************************************************************
   */
+  /////////////////////////////////IMPORTANT NOTE: make sure to comment the UART4_HANDLER() in stm32h7xx_it.c
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "adc.h"
+#include "dma.h"
 #include "usart.h"
 #include "gpio.h"
-#include "AD9959.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "Serial.h"
+#include "Key2.h"
+
+#include "AD9959.h"
+#include "delay.h"
+#include "ch455.h"
 
 /* USER CODE END Includes */
 
@@ -46,11 +54,23 @@
 
 /* USER CODE BEGIN PV */
 
+//extern const unsigned char BCD_decode_tab[0x10];
+//extern uint16_t CH455_KEY_RX_FLAG; //���̽���״̬���	
+//extern uint8_t CH455_KEY_NUM;			//���¼��̵�ֵ
+
+
+/*
+Private var for DDS
+*/
+uint32_t CW_fre = 30000000;//CW initial fre
+uint32_t CW_amp = 1023;//CW initial amp
+uint8_t a = 2,b=0,c=2,d=5;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-
 static void MPU_Config(void);
 /* USER CODE BEGIN PFP */
 
@@ -59,14 +79,87 @@ static void MPU_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+
+
+/*
+GPIO External Interrupt Callback Function
+Pins: 	PC12-->LED4(PC6),PE3-->LED5(PC7)
+				PC13-->CH455 INT
+
+*/
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	delay_ms(50);
+	if(GPIO_Pin==GPIO_PIN_12)
+	{
+		if(GPIO_PIN_RESET==HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_12))
+		{
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
+			if(led4_status==0)
+			{
+				Screen_SendStr("led4.val=1",FB_ON);
+				led4_status=1;
+			}
+			else
+			{
+				Screen_SendStr("led4.val=0",FB_ON);
+				led4_status=0;
+			}
+				
+		}//?? PC6
+  }
+	else if (GPIO_Pin == GPIO_PIN_3)
+	{
+		if (GPIO_PIN_RESET == HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_3))//PE3
+		{
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
+			if(led5_status==0)
+			{
+				Screen_SendStr("led5.val=1",FB_ON);
+				led5_status=1;
+			}
+			else
+			{
+				Screen_SendStr("led5.val=0",FB_ON);
+				led5_status=0;
+			}
+		}//PC7
+	}
+	
+	
+	//CH455's input
+	if (GPIO_Pin == GPIO_PIN_13)
+	{
+		printf("CH455\r\n");
+		//PC13
+			CH455_KEY_RX_FLAG = 1;
+		
+			CH455_KEY_NUM = CH455_Key_Read();
+			__HAL_GPIO_EXTI_CLEAR_FLAG(GPIO_PIN_13);
+		
+	}			
+}
+
+
+
+
+
+
+
+
+
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
-int main(void) {
+int main(void)
+{
+
   /* USER CODE BEGIN 1 */
+  
+  //MODIFIED from main.c's request method
 
   /* USER CODE END 1 */
 
@@ -79,33 +172,76 @@ int main(void) {
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+	
   /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  
+  
+	
+	
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART1_UART_Init();
+  MX_DMA_Init();
+  MX_UART4_Init();
+  MX_UART5_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
+	
+	
+	
+	//printf("before delay\r\n");
+	delay_init(480);
+	
+	delay_ms(10);
+	
+	
+	//Serial_printf("DDS1\r\n");
+	Init_AD9959();
+	AD9959_SetPhase4Channel(0,0,0,0);
+	AD9959_SetFrequency4Channel(CW_fre,0,0,0);
+	AD9959_SetAmp4Channel(CW_amp,0,0,0);
+	IO_Update();
+	Write_frequence(0,2000000);
+	Write_Amplitude(0,1023);
+	Write_Phase(0,0);
+	//Serial_printf("DDS2\r\n");
+	
+	CH455_init();
+	CH455_Display(1,a);
+	CH455_Display(2,b);
+	CH455_Display(3,c);
+	CH455_Display(4,d);
+	
+	
+	
+	
+	
+	__HAL_UART_ENABLE_IT(huart_debug, UART_IT_RXNE);
+	Serial_printf("\r\nIT_RXNE ENABLED\r\n");
+	
+/////////////////////////////////////////////////////TEST TRANSMISSION
+	Serial_printf("\r\n===========INITIALIZATION COMPLETE==========\r\n\n");
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1) {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
-    delay_1(100000);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-    delay_1(100001);
+  while (1)
+  {
+	  
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	
+		print2serial();
+		print2screen();
+	  
   }
   /* USER CODE END 3 */
 }
@@ -114,7 +250,8 @@ int main(void) {
   * @brief System Clock Configuration
   * @retval None
   */
-void SystemClock_Config(void) {
+void SystemClock_Config(void)
+{
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
@@ -126,8 +263,7 @@ void SystemClock_Config(void) {
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
 
-  while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {
-  }
+  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -144,15 +280,16 @@ void SystemClock_Config(void) {
   RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
   RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
   RCC_OscInitStruct.PLL.PLLFRACN = 0;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-    | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2
-    | RCC_CLOCKTYPE_D3PCLK1 | RCC_CLOCKTYPE_D1PCLK1;
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
+                              |RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
@@ -161,7 +298,8 @@ void SystemClock_Config(void) {
   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+  {
     Error_Handler();
   }
 }
@@ -170,9 +308,10 @@ void SystemClock_Config(void) {
 
 /* USER CODE END 4 */
 
-/* MPU Configuration */
+ /* MPU Configuration */
 
-void MPU_Config(void) {
+void MPU_Config(void)
+{
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
 
   /* Disables the MPU */
@@ -195,21 +334,23 @@ void MPU_Config(void) {
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
 }
 
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
-void Error_Handler(void) {
+void Error_Handler(void)
+{
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
-  while (1) {
+  while (1)
+  {
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
 #ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
